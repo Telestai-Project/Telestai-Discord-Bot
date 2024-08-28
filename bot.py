@@ -5,7 +5,7 @@ import time
 import os
 from dotenv import load_dotenv
 
-# Loan env variables
+# Load env variables
 load_dotenv()
 
 # Get Discord bot token
@@ -53,6 +53,8 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
             formatted_value = "{:,.0f}".format(round(stat_value))
         elif channel_name.lower() in ["difficulty:", "block:"]:
             formatted_value = "{:.0f}".format(stat_value)
+        elif channel_name.lower() == "xeggex:":
+            formatted_value = "{:.2f} / 5K".format(stat_value)
         else:
             formatted_value = stat_value
 
@@ -64,12 +66,13 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
 # Function to update all statistics channels within a guild
 async def update_stats_channels(guild):
     try:
-        # Fetch server statistics from the new APIs
+        # Fetch server statistics from the APIs
         difficulty_data = requests.get("https://telestai.cryptoscope.io/api/getdifficulty").json()
         hashrate_data = requests.get("https://telestai.cryptoscope.io/api/getnetworkhashps").json()
         block_data = requests.get("https://telestai.cryptoscope.io/api/getblockcount").json()
         supply_data = requests.get("https://telestai.cryptoscope.io/api/getcoinsupply").json()
         price_data = requests.get("https://api.exbitron.digital/api/v1/cg/tickers").json()
+        xeggex_data = requests.get("https://www.telestai.io/api/total-balance").json()
 
         # Extract necessary values
         difficulty = difficulty_data["difficulty_raw"]
@@ -77,6 +80,10 @@ async def update_stats_channels(guild):
         block_count = block_data["blockcount"]
         supply = float(supply_data["coinsupply"])
         price = next(item for item in price_data if item["ticker_id"] == "TLS-USDT")["last_price"]
+        xeggex = xeggex_data["totalRaisedInUsd"]
+
+        # Format xeggex with 2 decimals and add "/ 5K"
+        xeggex_formatted = "{:.2f} / 5K".format(xeggex)
 
         # Define the category name for statistics channels
         category_name = "Telestai Server Stats"
@@ -103,7 +110,13 @@ async def update_stats_channels(guild):
         # Calculate market cap and update its channel
         market_cap = round(supply * float(price))
         await create_or_update_channel(guild, category, "Market Cap: $", market_cap)
+        time.sleep(0.5)
 
+        # Update XeggeX channel with the formatted value
+        await create_or_update_channel(guild, category, "XeggeX: $", xeggex_formatted)
+        time.sleep(0.5)
+
+        # Set all channels to private
         for channel in category.voice_channels:
             await set_channel_private(category, channel)
 
