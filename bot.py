@@ -43,20 +43,25 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
     try:
         channel = await get_or_create_channel(category, channel_name)
 
-        if channel_name.lower() == "supply:":
-            formatted_value = "{:,.0f} TLS".format(stat_value)
-        elif channel_name.lower() == "price: $":
-            formatted_value = "{:.4f}".format(stat_value)
-        elif channel_name.lower() == "hashrate":
-            formatted_value = "{:,.3f}".format(round(stat_value))
-        elif channel_name.lower() == "market cap:":
-            formatted_value = "{:,.0f}".format(round(stat_value))
-        elif channel_name.lower() in ["difficulty:", "block:"]:
-            formatted_value = "{:.0f}".format(stat_value)
-        elif channel_name.lower() == "xeggex:":
-            formatted_value = "{:.2f} / 5K".format(stat_value)
-        else:
+        if isinstance(stat_value, str) and stat_value == "N/A":
             formatted_value = stat_value
+        else:
+            if channel_name.lower() == "members:":
+                formatted_value = "{:.0f}".format(stat_value)
+            elif channel_name.lower() == "supply:":
+                formatted_value = "{:,.0f} TLS".format(stat_value)
+            elif channel_name.lower() == "price: $":
+                formatted_value = "{:.4f}".format(stat_value)
+            elif channel_name.lower() == "hashrate: gh/s":
+                formatted_value = "{:,.3f}".format(round(stat_value))
+            elif channel_name.lower() == "market cap:":
+                formatted_value = "{:,.0f}".format(round(stat_value))
+            elif channel_name.lower() in ["difficulty:", "block:"]:
+                formatted_value = "{:.0f}".format(stat_value)
+            elif channel_name.lower() == "xeggex:":
+                formatted_value = "{:.2f} / 5K".format(stat_value)
+            else:
+                formatted_value = stat_value
 
         await channel.edit(name=f"{channel_name} {formatted_value}")
 
@@ -67,23 +72,46 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
 async def update_stats_channels(guild):
     try:
         # Fetch server statistics from the APIs
-        difficulty_data = requests.get("https://telestai.cryptoscope.io/api/getdifficulty").json()
-        hashrate_data = requests.get("https://telestai.cryptoscope.io/api/getnetworkhashps").json()
-        block_data = requests.get("https://telestai.cryptoscope.io/api/getblockcount").json()
-        supply_data = requests.get("https://telestai.cryptoscope.io/api/getcoinsupply").json()
-        price_data = requests.get("https://api.exbitron.digital/api/v1/cg/tickers").json()
-        xeggex_data = requests.get("https://www.telestai.io/api/total-balance").json()
+        try:
+            difficulty_data = requests.get("https://telestai.cryptoscope.io/api/getdifficulty").json()
+            difficulty = difficulty_data["difficulty_raw"]
+        except Exception:
+            difficulty = "N/A"
 
-        # Extract necessary values
-        difficulty = difficulty_data["difficulty_raw"]
-        hashrate = round(hashrate_data["hashrate_raw"] / 1e9, 3)  # Convert to GH/s
-        block_count = block_data["blockcount"]
-        supply = float(supply_data["coinsupply"])
-        price = next(item for item in price_data if item["ticker_id"] == "TLS-USDT")["last_price"]
-        xeggex = xeggex_data["totalRaisedInUsd"]
+        try:
+            hashrate_data = requests.get("https://telestai.cryptoscope.io/api/getnetworkhashps").json()
+            hashrate = round(hashrate_data["hashrate_raw"] / 1e9, 3)  # Convert to GH/s
+        except Exception:
+            hashrate = "N/A"
 
-        # Format xeggex with 2 decimals and add "/ 5K"
-        xeggex_formatted = "{:.2f} / 5K".format(xeggex)
+        try:
+            block_data = requests.get("https://telestai.cryptoscope.io/api/getblockcount").json()
+            block_count = block_data["blockcount"]
+        except Exception:
+            block_count = "N/A"
+
+        try:
+            supply_data = requests.get("https://telestai.cryptoscope.io/api/getcoinsupply").json()
+            supply = float(supply_data["coinsupply"])
+        except Exception:
+            supply = "N/A"
+
+        try:
+            price_data = requests.get("https://api.exbitron.digital/api/v1/cg/tickers").json()
+            price = next(item for item in price_data if item["ticker_id"] == "TLS-USDT")["last_price"]
+        except Exception:
+            price = "N/A"
+
+        try:
+            xeggex_data = requests.get("https://www.telestai.io/api/total-balance").json()
+            xeggex = xeggex_data["totalRaisedInUsd"]
+            xeggex_formatted = "{:.2f} / 5K".format(xeggex)
+        except Exception:
+            xeggex_formatted = "N/A"
+        try:
+            member_count = guild.member_count
+        except Exception:
+            member_count = "N/A"
 
         # Define the category name for statistics channels
         category_name = "Telestai Server Stats"
@@ -96,6 +124,9 @@ async def update_stats_channels(guild):
         time.sleep(0.5)
 
         # Update or create individual statistics channels
+
+        await create_or_update_channel(guild, category, "Members:", member_count)
+        time.sleep(0.5)
         await create_or_update_channel(guild, category, "Difficulty:", difficulty)
         time.sleep(0.5)
         await create_or_update_channel(guild, category, "Hashrate: GH/s", hashrate)
@@ -137,3 +168,4 @@ async def on_ready():
 
 # Run the bot with the provided token
 client.run(TOKEN)
+
