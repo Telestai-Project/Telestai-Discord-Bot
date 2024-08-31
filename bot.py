@@ -1,9 +1,13 @@
+#bot.py
 import discord
 from discord.ext import commands, tasks
 import requests
 import time
 import os
 from dotenv import load_dotenv
+
+# Import the extract.py script
+import extract
 
 # Load env variables
 load_dotenv()
@@ -102,12 +106,14 @@ async def update_stats_channels(guild):
         except Exception:
             price = "N/A"
 
-        try:
-            xeggex_data = requests.get("https://www.telestai.io/api/total-balance").json()
-            xeggex = xeggex_data["totalRaisedInUsd"]
-            xeggex_formatted = "{:.2f} / 5K".format(xeggex)
-        except Exception:
+        # Replace with the call to get_balances from extract.py
+        balances = extract.get_balances()
+        if "error" in balances:
             xeggex_formatted = "N/A"
+        else:
+            xeggex = balances["totalRaisedInUsd"]
+            xeggex_formatted = "{:.2f} / 5K".format(xeggex)
+
         try:
             member_count = guild.member_count
         except Exception:
@@ -168,4 +174,3 @@ async def on_ready():
 
 # Run the bot with the provided token
 client.run(TOKEN)
-

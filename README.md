@@ -48,6 +48,7 @@ pip install discord requests python-dotenv
 
 ```bash
 DISCORD_BOT_TOKEN=YOUR_BOT_TOKEN_HERE
+ETHERSCAN_API_TOKEN=YOUR_ETHERSCAN_TOKEN_HERE
 ```
 
 3. Set Permissions for .env
