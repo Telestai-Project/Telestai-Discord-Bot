@@ -22,6 +22,9 @@ intents.messages = True
 # Create a Discord bot instance
 client = commands.Bot(command_prefix="!", intents=intents)
 
+# Define a global variable to store the previous XeggeX value
+previous_xeggex_value = 0
+
 # Function to set a voice channel to private (disconnect for everyone)
 async def set_channel_private(category, channel):
     try:
@@ -74,6 +77,8 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
 
 # Function to update all statistics channels within a guild
 async def update_stats_channels(guild):
+    global previous_xeggex_value
+
     try:
         # Fetch server statistics from the APIs
         try:
@@ -130,7 +135,6 @@ async def update_stats_channels(guild):
         time.sleep(0.5)
 
         # Update or create individual statistics channels
-
         await create_or_update_channel(guild, category, "Members:", member_count)
         time.sleep(0.5)
         await create_or_update_channel(guild, category, "Difficulty:", difficulty)
@@ -152,6 +156,18 @@ async def update_stats_channels(guild):
         # Update XeggeX channel with the formatted value
         await create_or_update_channel(guild, category, "XeggeX: $", xeggex_formatted)
         time.sleep(0.5)
+
+        # Notify if XeggeX value has increased or if it's the first run
+        if xeggex > previous_xeggex_value:
+            channel = guild.get_channel(1187867994404175933)
+            if channel:
+                await channel.send(
+                    f":dart: **We're Getting Closer to Xeggex!** :dart:\n\n"
+                    f":moneybag: **New Amount:** `${xeggex_formatted}` **Goal**\n\n"
+                    f":link: Keep pushing forward—let's hit that target together! :muscle::rocket:"
+                )
+
+        previous_xeggex_value = xeggex
 
         # Set all channels to private
         for channel in category.voice_channels:
