@@ -1,7 +1,7 @@
 #bot.py
 import discord
 from discord.ext import commands, tasks
-import requests
+import aiohttp
 import time
 import os
 from dotenv import load_dotenv
@@ -24,6 +24,7 @@ client = commands.Bot(command_prefix="!", intents=intents)
 
 # Define a global variable to store the previous XeggeX value
 previous_xeggex_value = 0
+last_notification_time = 0
 
 # Function to set a voice channel to private (disconnect for everyone)
 async def set_channel_private(category, channel):
@@ -77,42 +78,47 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
 
 # Function to update all statistics channels within a guild
 async def update_stats_channels(guild):
-    global previous_xeggex_value
+    global previous_xeggex_value, last_notification_time
 
     try:
         # Fetch server statistics from the APIs
-        try:
-            difficulty_data = requests.get("https://telestai.cryptoscope.io/api/getdifficulty").json()
-            difficulty = difficulty_data["difficulty_raw"]
-        except Exception:
-            difficulty = "N/A"
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get("https://telestai.cryptoscope.io/api/getdifficulty") as response:
+                    difficulty_data = await response.json()
+                    difficulty = difficulty_data["difficulty_raw"]
+            except Exception:
+                difficulty = "N/A"
 
-        try:
-            hashrate_data = requests.get("https://telestai.cryptoscope.io/api/getnetworkhashps").json()
-            hashrate = round(hashrate_data["hashrate_raw"] / 1e9, 3)  # Convert to GH/s
-        except Exception:
-            hashrate = "N/A"
+            try:
+                async with session.get("https://telestai.cryptoscope.io/api/getnetworkhashps") as response:
+                    hashrate_data = await response.json()
+                    hashrate = round(hashrate_data["hashrate_raw"] / 1e9, 3)  # Convert to GH/s
+            except Exception:
+                hashrate = "N/A"
 
-        try:
-            block_data = requests.get("https://telestai.cryptoscope.io/api/getblockcount").json()
-            block_count = block_data["blockcount"]
-        except Exception:
-            block_count = "N/A"
+            try:
+                async with session.get("https://telestai.cryptoscope.io/api/getblockcount") as response:
+                    block_data = await response.json()
+                    block_count = block_data["blockcount"]
+            except Exception:
+                block_count = "N/A"
 
-        try:
-            supply_data = requests.get("https://telestai.cryptoscope.io/api/getcoinsupply").json()
-            supply = float(supply_data["coinsupply"])
-        except Exception:
-            supply = "N/A"
+            try:
+                async with session.get("https://telestai.cryptoscope.io/api/getcoinsupply") as response:
+                    supply_data = await response.json()
+                    supply = float(supply_data["coinsupply"])
+            except Exception:
+                supply = "N/A"
 
-        try:
-            price_data = requests.get("https://api.exbitron.digital/api/v1/cg/tickers").json()
-            price = next(item for item in price_data if item["ticker_id"] == "TLS-USDT")["last_price"]
-        except Exception:
-            price = "N/A"
+            try:
+                async with session.get("https://api.exbitron.digital/api/v1/cg/tickers") as response:
+                    price_data = await response.json()
+                    price = next(item for item in price_data if item["ticker_id"] == "TLS-USDT")["last_price"]
+            except Exception:
+                price = "N/A"
 
-        # Replace with the call to get_balances from extract.py
-        balances = extract.get_balances()
+        balances = await extract.get_balances()
         if "error" in balances:
             xeggex_formatted = "N/A"
         else:
@@ -145,12 +151,14 @@ async def update_stats_channels(guild):
         time.sleep(0.5)
         await create_or_update_channel(guild, category, "Supply:", supply)
         time.sleep(0.5)
-        await create_or_update_channel(guild, category, "Price: $", float(price))
+        if price != "N/A":
+            await create_or_update_channel(guild, category, "Price: $", float(price))
         time.sleep(0.5)
 
         # Calculate market cap and update its channel
-        market_cap = round(supply * float(price))
-        await create_or_update_channel(guild, category, "Market Cap: $", market_cap)
+        if supply != "N/A" and price != "N/A":
+            market_cap = round(supply * float(price))
+            await create_or_update_channel(guild, category, "Market Cap: $", market_cap)
         time.sleep(0.5)
 
         # Update XeggeX channel with the formatted value
@@ -158,14 +166,21 @@ async def update_stats_channels(guild):
         time.sleep(0.5)
 
         # Notify if XeggeX value has increased or if it's the first run
-        if xeggex > previous_xeggex_value:
-            channel = guild.get_channel(1187867994404175933)
+        current_time = time.time()
+        print(f"Current time: {current_time} ({time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(current_time))}), "
+              f"Last notification time: {last_notification_time} ({time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(last_notification_time))})")
+        if xeggex > previous_xeggex_value and (current_time - last_notification_time >= 360):
+            print("Sending notification message...")
+            channel = guild.get_channel(1191503792320036974)
             if channel:
                 await channel.send(
                     f":dart: **We're Getting Closer to Xeggex!** :dart:\n\n"
                     f":moneybag: **New Amount:** `${xeggex_formatted}` **Goal**\n\n"
                     f":link: Keep pushing forward—let's hit that target together! :muscle::rocket:"
                 )
+            last_notification_time = current_time
+        else:
+            print("Notification not sent. Either XeggeX value did not increase or 6 minutes have not passed.")
 
         previous_xeggex_value = xeggex
 
