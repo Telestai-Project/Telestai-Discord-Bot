@@ -169,9 +169,9 @@ async def update_stats_channels(guild):
         current_time = time.time()
         print(f"Current time: {current_time} ({time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(current_time))}), "
               f"Last notification time: {last_notification_time} ({time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(last_notification_time))})")
-        if xeggex > previous_xeggex_value and (current_time - last_notification_time >= 360):
+        if xeggex > previous_xeggex_value and (current_time - last_notification_time >= 3600):
             print("Sending notification message...")
-            channel = guild.get_channel(1191503792320036974)
+            channel = guild.get_channel(1187867994404175933)
             if channel:
                 await channel.send(
                     f":dart: **We're Getting Closer to Xeggex!** :dart:\n\n"
