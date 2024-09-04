@@ -5,6 +5,7 @@ import aiohttp
 import time
 import os
 from dotenv import load_dotenv
+import json
 
 # Import the extract.py script
 import extract
@@ -61,7 +62,7 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
             elif channel_name.lower() == "price: $":
                 formatted_value = "{:.4f}".format(stat_value)
             elif channel_name.lower() == "hashrate: gh/s":
-                formatted_value = "{:,.3f}".format(round(stat_value))
+                formatted_value = "{:,.3f}".format(stat_value)
             elif channel_name.lower() == "market cap:":
                 formatted_value = "{:,.0f}".format(round(stat_value))
             elif channel_name.lower() in ["difficulty:", "block:"]:
@@ -93,7 +94,7 @@ async def update_stats_channels(guild):
             try:
                 async with session.get("https://telestai.cryptoscope.io/api/getnetworkhashps") as response:
                     hashrate_data = await response.json()
-                    hashrate = round(hashrate_data["hashrate_raw"] / 1e9, 3)  # Convert to GH/s
+                    hashrate = hashrate_data["hashrate_raw"] / 1e9  # Convert to GH/s
             except Exception:
                 hashrate = "N/A"
 
@@ -113,10 +114,17 @@ async def update_stats_channels(guild):
 
             try:
                 async with session.get("https://api.exbitron.digital/api/v1/cg/tickers") as response:
-                    price_data = await response.json()
+                    # Leer el contenido como texto primero
+                    text_data = await response.text()
+
+                    # Intentar decodificar el texto como JSON
+                    price_data = json.loads(text_data)
+
+                    # Buscar el ticker deseado y obtener el precio
                     price = next(item for item in price_data if item["ticker_id"] == "TLS-USDT")["last_price"]
+
             except Exception:
-                price = "N/A"
+                supply = "N/A"
 
         balances = await extract.get_balances()
         if "error" in balances:
@@ -141,18 +149,23 @@ async def update_stats_channels(guild):
         time.sleep(0.5)
 
         # Update or create individual statistics channels
+        print(f"Members '{member_count}'")
         await create_or_update_channel(guild, category, "Members:", member_count)
         time.sleep(0.5)
+        print(f"Difficulty '{difficulty}'")
         await create_or_update_channel(guild, category, "Difficulty:", difficulty)
         time.sleep(0.5)
+        print(f"Hashrate '{hashrate}'")
         await create_or_update_channel(guild, category, "Hashrate: GH/s", hashrate)
         time.sleep(0.5)
+        print(f"Block '{block_count}'")
         await create_or_update_channel(guild, category, "Block:", block_count)
         time.sleep(0.5)
+        print(f"Supply '{supply}'")
         await create_or_update_channel(guild, category, "Supply:", supply)
         time.sleep(0.5)
-        if price != "N/A":
-            await create_or_update_channel(guild, category, "Price: $", float(price))
+        print(f"Price '{price}'")
+        await create_or_update_channel(guild, category, "Price: $", float(price))
         time.sleep(0.5)
 
         # Calculate market cap and update its channel
@@ -169,7 +182,7 @@ async def update_stats_channels(guild):
         current_time = time.time()
         print(f"Current time: {current_time} ({time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(current_time))}), "
               f"Last notification time: {last_notification_time} ({time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(last_notification_time))})")
-        if xeggex > previous_xeggex_value and (current_time - last_notification_time >= 3600):
+        if xeggex > previous_xeggex_value and (current_time - last_notification_time >= 14400):
             print("Sending notification message...")
             channel = guild.get_channel(1187867994404175933)
             if channel:
@@ -179,10 +192,9 @@ async def update_stats_channels(guild):
                     f":link: Keep pushing forward—let's hit that target together! :muscle::rocket:"
                 )
             last_notification_time = current_time
+            previous_xeggex_value = xeggex
         else:
-            print("Notification not sent. Either XeggeX value did not increase or 6 minutes have not passed.")
-
-        previous_xeggex_value = xeggex
+            print("Notification not sent. Either XeggeX value did not increase or 240 minutes have not passed.")
 
         # Set all channels to private
         for channel in category.voice_channels:
