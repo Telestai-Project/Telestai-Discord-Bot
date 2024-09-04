@@ -38,7 +38,7 @@ source venv/bin/activate
 ### Step 4: Install Dependencies
 
 ```bash
-pip install discord requests python-dotenv
+pip install discord requests python-dotenv aiohttp
 ```
 
 ### Step 5: Configure the Bot
