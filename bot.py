@@ -113,18 +113,12 @@ async def update_stats_channels(guild):
                 supply = "N/A"
 
             try:
-                async with session.get("https://api.exbitron.digital/api/v1/cg/tickers") as response:
-                    # Leer el contenido como texto primero
+                async with session.get("https://tradeogre.com/api/v1/ticker/tls-usdt") as response:
                     text_data = await response.text()
-
-                    # Intentar decodificar el texto como JSON
                     price_data = json.loads(text_data)
-
-                    # Buscar el ticker deseado y obtener el precio
-                    price = next(item for item in price_data if item["ticker_id"] == "TLS-USDT")["last_price"]
-
+                    price = price_data["price"]
             except Exception:
-                supply = "N/A"
+                price = "N/A"
 
         balances = await extract.get_balances()
         if "error" in balances:
