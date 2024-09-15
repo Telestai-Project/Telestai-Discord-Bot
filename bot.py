@@ -16,9 +16,10 @@ load_dotenv()
 # Get Discord bot token
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-# Define intents to enable message events
+# Define intents to enable message and member events
 intents = discord.Intents.default()
 intents.messages = True
+intents.members = True
 
 # Create a Discord bot instance
 client = commands.Bot(command_prefix="!", intents=intents)
