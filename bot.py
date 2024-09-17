@@ -7,9 +7,6 @@ import os
 from dotenv import load_dotenv
 import json
 
-# Import the extract.py script
-import extract
-
 # Load env variables
 load_dotenv()
 
@@ -25,7 +22,6 @@ intents.members = True
 client = commands.Bot(command_prefix="!", intents=intents)
 
 # Define a global variable to store the previous XeggeX value
-previous_xeggex_value = 0
 last_notification_time = 0
 
 # Function to set a voice channel to private (disconnect for everyone)
@@ -68,8 +64,6 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
                 formatted_value = "{:,.0f}".format(round(stat_value))
             elif channel_name.lower() in ["difficulty:", "block:"]:
                 formatted_value = "{:.0f}".format(stat_value)
-            elif channel_name.lower() == "xeggex:":
-                formatted_value = "{:.2f} / 5K".format(stat_value)
             else:
                 formatted_value = stat_value
 
@@ -80,7 +74,7 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
 
 # Function to update all statistics channels within a guild
 async def update_stats_channels(guild):
-    global previous_xeggex_value, last_notification_time
+    global last_notification_time
 
     try:
         # Fetch server statistics from the APIs
@@ -120,13 +114,6 @@ async def update_stats_channels(guild):
                     price = price_data["price"]
             except Exception:
                 price = "N/A"
-
-        balances = await extract.get_balances()
-        if "error" in balances:
-            xeggex_formatted = "N/A"
-        else:
-            xeggex = balances["totalRaisedInUsd"]
-            xeggex_formatted = "{:.2f} / 5K".format(xeggex)
 
         try:
             member_count = guild.member_count
@@ -168,28 +155,6 @@ async def update_stats_channels(guild):
             market_cap = round(supply * float(price))
             await create_or_update_channel(guild, category, "Market Cap: $", market_cap)
         time.sleep(0.5)
-
-        # Update XeggeX channel with the formatted value
-        await create_or_update_channel(guild, category, "XeggeX: $", xeggex_formatted)
-        time.sleep(0.5)
-
-        # Notify if XeggeX value has increased or if it's the first run
-        current_time = time.time()
-        print(f"Current time: {current_time} ({time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(current_time))}), "
-              f"Last notification time: {last_notification_time} ({time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(last_notification_time))})")
-        if xeggex > previous_xeggex_value and (current_time - last_notification_time >= 14400):
-            print("Sending notification message...")
-            channel = guild.get_channel(1187867994404175933)
-            if channel:
-                await channel.send(
-                    f":dart: **We're Getting Closer to Xeggex!** :dart:\n\n"
-                    f":moneybag: **New Amount:** `${xeggex_formatted}` **Goal**\n\n"
-                    f":link: Keep pushing forward—let's hit that target together! :muscle::rocket:"
-                )
-            last_notification_time = current_time
-            previous_xeggex_value = xeggex
-        else:
-            print("Notification not sent. Either XeggeX value did not increase or 240 minutes have not passed.")
 
         # Set all channels to private
         for channel in category.voice_channels:
