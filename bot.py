@@ -64,6 +64,8 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
                 formatted_value = "{:,.0f}".format(round(stat_value))
             elif channel_name.lower() in ["difficulty:", "block:"]:
                 formatted_value = "{:.0f}".format(stat_value)
+            elif channel_name.lower() == "24h volume:":
+                formatted_value = "{:,.2f}".format(stat_value)
             else:
                 formatted_value = stat_value
 
@@ -112,8 +114,10 @@ async def update_stats_channels(guild):
                     text_data = await response.text()
                     price_data = json.loads(text_data)
                     price = price_data["price"]
+                    volume = price_data["volume"]
             except Exception:
                 price = "N/A"
+                volume = "N/A"
 
         try:
             member_count = guild.member_count
@@ -148,6 +152,9 @@ async def update_stats_channels(guild):
         time.sleep(0.5)
         print(f"Price '{price}'")
         await create_or_update_channel(guild, category, "Price: $", float(price))
+        time.sleep(0.5)
+        print(f"24h Volume '{volume}'")
+        await create_or_update_channel(guild, category, "24h Volume: $", round(float(volume), 2))
         time.sleep(0.5)
 
         # Calculate market cap and update its channel
