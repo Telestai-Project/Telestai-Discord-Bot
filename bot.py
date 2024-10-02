@@ -57,7 +57,7 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
             elif channel_name.lower() == "supply:":
                 formatted_value = "{:,.0f} TLS".format(stat_value)
             elif channel_name.lower() == "price: $":
-                formatted_value = "{:.4f}".format(stat_value)
+                formatted_value = "{:.6f}".format(stat_value)
             elif channel_name.lower() == "hashrate: gh/s":
                 formatted_value = "{:,.3f}".format(stat_value)
             elif channel_name.lower() == "market cap:":
@@ -110,14 +110,28 @@ async def update_stats_channels(guild):
                 supply = "N/A"
 
             try:
-                async with session.get("https://tradeogre.com/api/v1/ticker/tls-usdt") as response:
-                    text_data = await response.text()
-                    price_data = json.loads(text_data)
-                    price = price_data["price"]
-                    volume = price_data["volume"]
+                async with session.get("https://api.xeggex.com/api/v2/market/getbysymbol/tls_usdt") as response:
+                    price_data = await response.json()
+                    #price_data = json.loads(text_data)
+                    price = price_data["lastPrice"]
+                    volume_tls = price_data["volume"]
+                    volume_xeggex = float(volume_tls) * float(price)
+                    print(volume_xeggex)
             except Exception:
                 price = "N/A"
-                volume = "N/A"
+                volume = 0
+
+            try:
+                async with session.get("https://tradeogre.com/api/v1/ticker/tls-usdt") as response:
+                    text_data = await response.text()
+                    volume_data = json.loads(text_data)
+                    volume_tradeogre = volume_data["volume"]
+                    print(volume_tradeogre)
+            except Exception:
+                price = 0
+
+            volume = float(volume_xeggex) + float(volume_tradeogre)
+
 
         try:
             member_count = guild.member_count
