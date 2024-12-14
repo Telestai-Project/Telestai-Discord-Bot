@@ -6,6 +6,7 @@ import time
 import os
 from dotenv import load_dotenv
 import json
+import tweepy
 
 # Load env variables
 load_dotenv()
@@ -23,6 +24,25 @@ client = commands.Bot(command_prefix="!", intents=intents)
 
 # Define a global variable to store the previous XeggeX value
 last_notification_time = 0
+
+# Twitter API credentials and username from .env
+API_KEY = os.getenv("TWITTER_API_KEY")
+API_SECRET_KEY = os.getenv("TWITTER_API_SECRET_KEY")
+BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN")
+TWITTER_USERNAME = os.getenv("TWITTER_USERNAME")
+
+# Authenticate with the Twitter API
+twitter_client = tweepy.Client(bearer_token=BEARER_TOKEN)
+
+# Function to get Twitter followers count
+async def get_twitter_followers(username):
+    try:
+        user = twitter_client.get_user(username=username, user_fields=['public_metrics'])
+        if user.data:
+            return user.data.public_metrics['followers_count']
+    except Exception as e:
+        print(f"An error occurred while fetching Twitter followers: {e}")
+    return "N/A"
 
 # Function to set a voice channel to private (disconnect for everyone)
 async def set_channel_private(category, channel):
@@ -63,9 +83,9 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
             elif channel_name.lower() == "market cap:":
                 formatted_value = "{:,.0f}".format(round(stat_value))
             elif channel_name.lower() in ["difficulty:", "block:"]:
-                formatted_value = "{:.0f}".format(stat_value)
+                formatted_value = "{:,.0f}".format(stat_value)
             elif channel_name.lower() == "24h volume:":
-                formatted_value = "{:,.2f}".format(stat_value)
+                formatted_value = "{:,.0f}".format(stat_value)
             else:
                 formatted_value = stat_value
 
@@ -79,6 +99,9 @@ async def update_stats_channels(guild):
     global last_notification_time
 
     try:
+        # Fetch Twitter followers count using the username from the environment variable
+        followers_count = await get_twitter_followers(TWITTER_USERNAME)
+
         # Fetch server statistics from the APIs
         async with aiohttp.ClientSession() as session:
             try:
@@ -149,6 +172,9 @@ async def update_stats_channels(guild):
         time.sleep(0.5)
 
         # Update or create individual statistics channels
+        print(f"Followers '{followers_count}'")
+        await create_or_update_channel(guild, category, "X Followers:", followers_count)
+        time.sleep(0.5)
         print(f"Members '{member_count}'")
         await create_or_update_channel(guild, category, "Members:", member_count)
         time.sleep(0.5)
@@ -167,14 +193,19 @@ async def update_stats_channels(guild):
         print(f"Price '{price}'")
         await create_or_update_channel(guild, category, "Price: $", float(price))
         time.sleep(0.5)
-        print(f"24h Volume '{volume}'")
-        await create_or_update_channel(guild, category, "24h Volume: $", round(float(volume), 2))
+        
+        # Ensure volume is formatted correctly
+        formatted_volume = "{:,.0f}".format(volume)
+        print(f"24h Volume '{formatted_volume}'")
+        await create_or_update_channel(guild, category, "24h Volume: $", formatted_volume)
         time.sleep(0.5)
 
-        # Calculate market cap and update its channel
+        # Calculate market cap and ensure it's formatted correctly
         if supply != "N/A" and price != "N/A":
             market_cap = round(supply * float(price))
-            await create_or_update_channel(guild, category, "Market Cap: $", market_cap)
+            formatted_market_cap = "{:,.0f}".format(market_cap)
+            print(f"Market Cap '{formatted_market_cap}'")
+            await create_or_update_channel(guild, category, "Market Cap: $", formatted_market_cap)
         time.sleep(0.5)
 
         # Set all channels to private
