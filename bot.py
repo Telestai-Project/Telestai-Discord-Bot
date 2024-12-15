@@ -34,15 +34,26 @@ TWITTER_USERNAME = os.getenv("TWITTER_USERNAME")
 # Authenticate with the Twitter API
 twitter_client = tweepy.Client(bearer_token=BEARER_TOKEN)
 
+# Global variables to store the last successful values
+last_followers_count = 713  # Initial value
+last_difficulty = "N/A"
+last_hashrate = "N/A"
+last_block_count = "N/A"
+last_supply = "N/A"
+last_price = "N/A"
+last_volume = "N/A"
+
 # Function to get Twitter followers count
 async def get_twitter_followers(username):
+    global last_followers_count
     try:
         user = twitter_client.get_user(username=username, user_fields=['public_metrics'])
         if user.data:
-            return user.data.public_metrics['followers_count']
+            last_followers_count = user.data.public_metrics['followers_count']
+            return last_followers_count
     except Exception as e:
         print(f"An error occurred while fetching Twitter followers: {e}")
-    return "N/A"
+    return last_followers_count
 
 # Function to set a voice channel to private (disconnect for everyone)
 async def set_channel_private(category, channel):
@@ -73,7 +84,7 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
             formatted_value = stat_value
         else:
             if channel_name.lower() == "members:":
-                formatted_value = "{:.0f}".format(stat_value)
+                formatted_value = "{:,.0f}".format(stat_value)
             elif channel_name.lower() == "supply:":
                 formatted_value = "{:,.0f} TLS".format(stat_value)
             elif channel_name.lower() == "price: $":
@@ -96,7 +107,7 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
 
 # Function to update all statistics channels within a guild
 async def update_stats_channels(guild):
-    global last_notification_time
+    global last_notification_time, last_difficulty, last_hashrate, last_block_count, last_supply, last_price, last_volume
 
     try:
         # Fetch Twitter followers count using the username from the environment variable
@@ -107,54 +118,49 @@ async def update_stats_channels(guild):
             try:
                 async with session.get("https://telestai.cryptoscope.io/api/getdifficulty") as response:
                     difficulty_data = await response.json()
-                    difficulty = difficulty_data["difficulty_raw"]
+                    last_difficulty = difficulty_data["difficulty_raw"]
             except Exception:
-                difficulty = "N/A"
+                pass
 
             try:
                 async with session.get("https://telestai.cryptoscope.io/api/getnetworkhashps") as response:
                     hashrate_data = await response.json()
-                    hashrate = hashrate_data["hashrate_raw"] / 1e9  # Convert to GH/s
+                    last_hashrate = hashrate_data["hashrate_raw"] / 1e9  # Convert to GH/s
             except Exception:
-                hashrate = "N/A"
+                pass
 
             try:
                 async with session.get("https://telestai.cryptoscope.io/api/getblockcount") as response:
                     block_data = await response.json()
-                    block_count = block_data["blockcount"]
+                    last_block_count = block_data["blockcount"]
             except Exception:
-                block_count = "N/A"
+                pass
 
             try:
                 async with session.get("https://telestai.cryptoscope.io/api/getcoinsupply") as response:
                     supply_data = await response.json()
-                    supply = float(supply_data["coinsupply"])
+                    last_supply = float(supply_data["coinsupply"])
             except Exception:
-                supply = "N/A"
+                pass
 
             try:
                 async with session.get("https://api.xeggex.com/api/v2/market/getbysymbol/tls_usdt") as response:
                     price_data = await response.json()
-                    #price_data = json.loads(text_data)
-                    price = price_data["lastPrice"]
+                    last_price = price_data["lastPrice"]
                     volume_tls = price_data["volume"]
-                    volume_xeggex = float(volume_tls) * float(price)
-                    print(volume_xeggex)
+                    volume_xeggex = float(volume_tls) * float(last_price)
             except Exception:
-                price = "N/A"
-                volume = 0
+                pass
 
             try:
                 async with session.get("https://tradeogre.com/api/v1/ticker/tls-usdt") as response:
                     text_data = await response.text()
                     volume_data = json.loads(text_data)
                     volume_tradeogre = volume_data["volume"]
-                    print(volume_tradeogre)
             except Exception:
-                price = 0
+                pass
 
-            volume = float(volume_xeggex) + float(volume_tradeogre)
-
+            last_volume = float(volume_xeggex) + float(volume_tradeogre)
 
         try:
             member_count = guild.member_count
@@ -178,31 +184,31 @@ async def update_stats_channels(guild):
         print(f"Members '{member_count}'")
         await create_or_update_channel(guild, category, "Members:", member_count)
         time.sleep(0.5)
-        print(f"Difficulty '{difficulty}'")
-        await create_or_update_channel(guild, category, "Difficulty:", difficulty)
+        print(f"Difficulty '{last_difficulty}'")
+        await create_or_update_channel(guild, category, "Difficulty:", last_difficulty)
         time.sleep(0.5)
-        print(f"Hashrate '{hashrate}'")
-        await create_or_update_channel(guild, category, "Hashrate: GH/s", hashrate)
+        print(f"Hashrate '{last_hashrate}'")
+        await create_or_update_channel(guild, category, "Hashrate: GH/s", last_hashrate)
         time.sleep(0.5)
-        print(f"Block '{block_count}'")
-        await create_or_update_channel(guild, category, "Block:", block_count)
+        print(f"Block '{last_block_count}'")
+        await create_or_update_channel(guild, category, "Block:", last_block_count)
         time.sleep(0.5)
-        print(f"Supply '{supply}'")
-        await create_or_update_channel(guild, category, "Supply:", supply)
+        print(f"Supply '{last_supply}'")
+        await create_or_update_channel(guild, category, "Supply:", last_supply)
         time.sleep(0.5)
-        print(f"Price '{price}'")
-        await create_or_update_channel(guild, category, "Price: $", float(price))
+        print(f"Price '{last_price}'")
+        await create_or_update_channel(guild, category, "Price: $", float(last_price))
         time.sleep(0.5)
         
         # Ensure volume is formatted correctly
-        formatted_volume = "{:,.0f}".format(volume)
+        formatted_volume = "{:,.0f}".format(last_volume)
         print(f"24h Volume '{formatted_volume}'")
         await create_or_update_channel(guild, category, "24h Volume: $", formatted_volume)
         time.sleep(0.5)
 
         # Calculate market cap and ensure it's formatted correctly
-        if supply != "N/A" and price != "N/A":
-            market_cap = round(supply * float(price))
+        if last_supply != "N/A" and last_price != "N/A":
+            market_cap = round(last_supply * float(last_price))
             formatted_market_cap = "{:,.0f}".format(market_cap)
             print(f"Market Cap '{formatted_market_cap}'")
             await create_or_update_channel(guild, category, "Market Cap: $", formatted_market_cap)
