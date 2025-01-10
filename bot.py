@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 import json
 import tweepy
+import requests
 
 # Load env variables
 load_dotenv()
@@ -42,6 +43,22 @@ last_block_count = "N/A"
 last_supply = "N/A"
 last_price = "N/A"
 last_volume = "N/A"
+
+# Add your Telegram bot token here
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+# Function to get Telegram followers count
+def get_telegram_followers():
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getChatMembersCount?chat_id={TELEGRAM_CHAT_ID}"
+        response = requests.get(url)
+        data = response.json()
+        if data["ok"]:
+            return data["result"]
+    except Exception as e:
+        print(f"An error occurred while fetching Telegram followers: {e}")
+    return "N/A"
 
 # Function to get Twitter followers count
 async def get_twitter_followers(username):
@@ -83,7 +100,7 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
         if isinstance(stat_value, str) and stat_value == "N/A":
             formatted_value = stat_value
         else:
-            if channel_name.lower() == "members:":
+            if channel_name.lower() in ["x followers:", "telegram followers:", "members:"]:
                 formatted_value = "{:,.0f}".format(stat_value)
             elif channel_name.lower() == "supply:":
                 formatted_value = "{:,.0f} TLS".format(stat_value)
@@ -112,6 +129,9 @@ async def update_stats_channels(guild):
     try:
         # Fetch Twitter followers count using the username from the environment variable
         followers_count = await get_twitter_followers(TWITTER_USERNAME)
+
+        # Fetch Telegram followers count
+        telegram_followers_count = get_telegram_followers()
 
         # Fetch server statistics from the APIs
         async with aiohttp.ClientSession() as session:
@@ -180,6 +200,9 @@ async def update_stats_channels(guild):
         # Update or create individual statistics channels
         print(f"Followers '{followers_count}'")
         await create_or_update_channel(guild, category, "X Followers:", followers_count)
+        time.sleep(0.5)
+        print(f"Telegram Followers '{telegram_followers_count}'")
+        await create_or_update_channel(guild, category, "Telegram Followers:", telegram_followers_count)
         time.sleep(0.5)
         print(f"Members '{member_count}'")
         await create_or_update_channel(guild, category, "Members:", member_count)
