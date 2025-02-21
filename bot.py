@@ -36,7 +36,7 @@ TWITTER_USERNAME = os.getenv("TWITTER_USERNAME")
 twitter_client = tweepy.Client(bearer_token=BEARER_TOKEN)
 
 # Global variables to store the last successful values
-last_followers_count = 713  # Initial value
+last_followers_count = 1294  # Initial value
 last_difficulty = "N/A"
 last_hashrate = "N/A"
 last_block_count = "N/A"
@@ -170,17 +170,19 @@ async def update_stats_channels(guild):
                     volume_tls = price_data["volume"]
                     volume_xeggex = float(volume_tls) * float(last_price)
             except Exception:
-                pass
+                last_price = "N/A"  # Set price to "N/A" if there's an error
+                volume_xeggex = "N/A" # Set volume to "N/A" if there's an error
 
-            try:
-                async with session.get("https://tradeogre.com/api/v1/ticker/tls-usdt") as response:
-                    text_data = await response.text()
-                    volume_data = json.loads(text_data)
-                    volume_tradeogre = volume_data["volume"]
-            except Exception:
-                pass
+            # try:
+            #     async with session.get("https://tradeogre.com/api/v1/ticker/tls-usdt") as response:
+            #         text_data = await response.text()
+            #         volume_data = json.loads(text_data)
+            #         volume_tradeogre = volume_data["volume"]
+            # except Exception:
+            #     volume_tradeogre = 0  # Set volume to 0 if there's an error
 
-            last_volume = float(volume_xeggex) + float(volume_tradeogre)
+            #last_volume = float(volume_xeggex) + float(volume_tradeogre)
+            last_volume = volume_xeggex
 
         try:
             member_count = guild.member_count
@@ -220,11 +222,17 @@ async def update_stats_channels(guild):
         await create_or_update_channel(guild, category, "Supply:", last_supply)
         time.sleep(0.5)
         print(f"Price '{last_price}'")
-        await create_or_update_channel(guild, category, "Price: $", float(last_price))
+        if last_price != "N/A":
+            await create_or_update_channel(guild, category, "Price: $", float(last_price))
+        else:
+            await create_or_update_channel(guild, category, "Price: $", last_price)
         time.sleep(0.5)
         
         # Ensure volume is formatted correctly
-        formatted_volume = "{:,.0f}".format(last_volume)
+        if last_volume != "N/A":
+            formatted_volume = "{:,.0f}".format(last_volume)
+        else:
+            formatted_volume = "N/A"
         print(f"24h Volume '{formatted_volume}'")
         await create_or_update_channel(guild, category, "24h Volume: $", formatted_volume)
         time.sleep(0.5)
@@ -233,8 +241,10 @@ async def update_stats_channels(guild):
         if last_supply != "N/A" and last_price != "N/A":
             market_cap = round(last_supply * float(last_price))
             formatted_market_cap = "{:,.0f}".format(market_cap)
-            print(f"Market Cap '{formatted_market_cap}'")
-            await create_or_update_channel(guild, category, "Market Cap: $", formatted_market_cap)
+        else:
+            formatted_market_cap = "N/A"
+        print(f"Market Cap '{formatted_market_cap}'")
+        await create_or_update_channel(guild, category, "Market Cap: $", formatted_market_cap)
         time.sleep(0.5)
 
         # Set all channels to private
