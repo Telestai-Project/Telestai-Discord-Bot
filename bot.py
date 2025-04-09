@@ -36,7 +36,7 @@ TWITTER_USERNAME = os.getenv("TWITTER_USERNAME")
 twitter_client = tweepy.Client(bearer_token=BEARER_TOKEN)
 
 # Global variables to store the last successful values
-last_followers_count = 1294  # Initial value
+last_followers_count = 1263  # Initial value
 last_difficulty = "N/A"
 last_hashrate = "N/A"
 last_block_count = "N/A"
@@ -166,13 +166,12 @@ async def update_stats_channels(guild):
             try:
                 async with session.get("https://api.xeggex.com/api/v2/market/getbysymbol/tls_usdt") as response:
                     price_data = await response.json()
-                    last_price = price_data["lastPrice"]
+                    last_price_xeggex = price_data["lastPrice"]
                     volume_tls = price_data["volume"]
-                    volume_xeggex = float(volume_tls) * float(last_price)
+                    volume_xeggex = float(volume_tls) * float(last_price_xeggex)
             except Exception:
-                last_price = "N/A"  # Set price to "N/A" if there's an error
                 volume_xeggex = "N/A" # Set volume to "N/A" if there's an error
-
+                
             # try:
             #     async with session.get("https://tradeogre.com/api/v1/ticker/tls-usdt") as response:
             #         text_data = await response.text()
@@ -180,9 +179,47 @@ async def update_stats_channels(guild):
             #         volume_tradeogre = volume_data["volume"]
             # except Exception:
             #     volume_tradeogre = 0  # Set volume to 0 if there's an error
+            
+            volume_coinmetro = "N/A"
+            last_price_coinmetro = "N/A"
 
-            #last_volume = float(volume_xeggex) + float(volume_tradeogre)
-            last_volume = volume_xeggex
+            try:
+                async with session.get("https://api.coinmetro.com/exchange/prices") as response:
+                    coinmetro_data = await response.json()
+                    # Find TLS price and volume from CoinMetro data
+                    for price in coinmetro_data["latestPrices"]:
+                        if price["pair"] == "TLSUSDT":
+                            last_price_coinmetro = price["price"]
+                            break
+                    for volume in coinmetro_data["24hInfo"]:
+                        if volume["pair"] == "TLSUSDT":
+                            volume_coinmetro = float(volume["v"]) * float(last_price_coinmetro)
+                            break
+            except Exception:
+                last_price_coinmetro = "N/A"
+                volume_coinmetro = "N/A" 
+
+            # Calculate last price
+            if last_price_xeggex != "N/A" and last_price_coinmetro != "N/A":
+                last_price = (float(last_price_xeggex) + float(last_price_coinmetro)) / 2
+            elif last_price_xeggex != "N/A":
+                last_price = last_price_xeggex
+            elif last_price_coinmetro != "N/A":
+                last_price = last_price_coinmetro
+
+            # Calculate total volume
+            try:
+                if volume_xeggex != "N/A" and volume_coinmetro != "N/A":
+                    last_volume = float(volume_xeggex) + float(volume_coinmetro)
+                elif volume_xeggex != "N/A":
+                    last_volume = volume_xeggex
+                elif volume_coinmetro != "N/A":
+                    last_volume = volume_coinmetro
+                else:
+                    last_volume = "N/A"
+            except Exception as e:
+                print(f"Error calculating total volume: {e}")
+                last_volume = "N/A"
 
         try:
             member_count = guild.member_count
