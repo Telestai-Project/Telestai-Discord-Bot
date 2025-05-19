@@ -36,7 +36,7 @@ TWITTER_USERNAME = os.getenv("TWITTER_USERNAME")
 twitter_client = tweepy.Client(bearer_token=BEARER_TOKEN)
 
 # Global variables to store the last successful values
-last_followers_count = 1263  # Initial value
+last_followers_count = 1503  # Initial value
 last_difficulty = "N/A"
 last_hashrate = "N/A"
 last_block_count = "N/A"
@@ -169,43 +169,78 @@ async def update_stats_channels(guild):
                     last_price_xeggex = price_data["lastPrice"]
                     volume_tls = price_data["volume"]
                     volume_xeggex = float(volume_tls) * float(last_price_xeggex)
+                    price_change_xeggex = price_data.get("changePercent", "N/A")
             except Exception:
                 volume_xeggex = "N/A" # Set volume to "N/A" if there's an error
+                price_change_xeggex = "N/A"
                 
-            # try:
-            #     async with session.get("https://tradeogre.com/api/v1/ticker/tls-usdt") as response:
-            #         text_data = await response.text()
-            #         volume_data = json.loads(text_data)
-            #         volume_tradeogre = volume_data["volume"]
-            # except Exception:
-            #     volume_tradeogre = 0  # Set volume to 0 if there's an error
-            
             volume_coinmetro = "N/A"
             last_price_coinmetro = "N/A"
+            price_change_coinmetro = "N/A"
 
             try:
                 async with session.get("https://api.coinmetro.com/exchange/prices") as response:
                     coinmetro_data = await response.json()
-                    # Find TLS price and volume from CoinMetro data
+                    # Find TLS price from latestPrices
                     for price in coinmetro_data["latestPrices"]:
                         if price["pair"] == "TLSUSDT":
                             last_price_coinmetro = price["price"]
                             break
-                    for volume in coinmetro_data["24hInfo"]:
-                        if volume["pair"] == "TLSUSDT":
-                            volume_coinmetro = float(volume["v"]) * float(last_price_coinmetro)
+                    
+                    # Find TLS volume and price change from 24hInfo
+                    for info in coinmetro_data["24hInfo"]:
+                        if info["pair"] == "TLSUSDT":
+                            volume_coinmetro = float(info["v"]) * float(last_price_coinmetro)
+                            # Calculate price change using delta
+                            price_change_coinmetro = float(info["delta"]) * 100
                             break
-            except Exception:
+            except Exception as e:
+                print(f"Error fetching CoinMetro data: {e}")
                 last_price_coinmetro = "N/A"
                 volume_coinmetro = "N/A" 
+                price_change_coinmetro = "N/A"
 
-            # Calculate last price
-            if last_price_xeggex != "N/A" and last_price_coinmetro != "N/A":
-                last_price = (float(last_price_xeggex) + float(last_price_coinmetro)) / 2
+            # Calculate last price using volume-weighted average
+            if last_price_xeggex != "N/A" and last_price_coinmetro != "N/A" and volume_xeggex != "N/A" and volume_coinmetro != "N/A":
+                total_volume = volume_xeggex + volume_coinmetro
+                
+                # Calculate weighted average
+                weight_xeggex = volume_xeggex / total_volume
+                weight_coinmetro = volume_coinmetro / total_volume
+                
+                last_price = (float(last_price_xeggex) * weight_xeggex) + (float(last_price_coinmetro) * weight_coinmetro)
+
+                # Calculate weighted average of price change
+                if price_change_xeggex != "N/A" and price_change_coinmetro != "N/A":
+                    price_change = (float(price_change_xeggex) * weight_xeggex) + (float(price_change_coinmetro) * weight_coinmetro)
+                    # Format price change with arrows
+                    if price_change >= 0:
+                        price_display = f"${last_price:.6f} (▲ +{price_change:.2f}% 24h)"
+                    else:
+                        price_display = f"${last_price:.6f} (▼ {price_change:.2f}% 24h)"
+                else:
+                    price_display = f"${last_price:.6f}"
             elif last_price_xeggex != "N/A":
                 last_price = last_price_xeggex
+                if price_change_xeggex != "N/A":
+                    if float(price_change_xeggex) >= 0:
+                        price_display = f"${last_price:.6f} (▲ +{price_change_xeggex:.2f}% 24h)"
+                    else:
+                        price_display = f"${last_price:.6f} (▼ {price_change_xeggex:.2f}% 24h)"
+                else:
+                    price_display = f"${last_price:.6f}"
             elif last_price_coinmetro != "N/A":
                 last_price = last_price_coinmetro
+                if price_change_coinmetro != "N/A":
+                    if float(price_change_coinmetro) >= 0:
+                        price_display = f"${last_price:.6f} (▲ +{price_change_coinmetro:.2f}% 24h)"
+                    else:
+                        price_display = f"${last_price:.6f} (▼ {price_change_coinmetro:.2f}% 24h)"
+                else:
+                    price_display = f"${last_price:.6f}"
+            else:
+                last_price = "N/A"
+                price_display = "N/A"
 
             # Calculate total volume
             try:
@@ -258,11 +293,8 @@ async def update_stats_channels(guild):
         print(f"Supply '{last_supply}'")
         await create_or_update_channel(guild, category, "Supply:", last_supply)
         time.sleep(0.5)
-        print(f"Price '{last_price}'")
-        if last_price != "N/A":
-            await create_or_update_channel(guild, category, "Price: $", float(last_price))
-        else:
-            await create_or_update_channel(guild, category, "Price: $", last_price)
+        print(f"Price '{price_display}'")
+        await create_or_update_channel(guild, category, "Price:", price_display)
         time.sleep(0.5)
         
         # Ensure volume is formatted correctly
