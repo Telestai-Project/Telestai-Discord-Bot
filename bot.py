@@ -122,6 +122,17 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
     except Exception as e:
         print(f"An error occurred while updating channel name: {e}")
 
+# Function to get Lasko users count
+async def get_lasko_users():
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get("https://testnetv1.telestai.io/api/v1/user/getAll") as response:
+                users_data = await response.json()
+                return len(users_data)
+    except Exception as e:
+        print(f"An error occurred while fetching Lasko users: {e}")
+        return "N/A"
+
 # Function to update all statistics channels within a guild
 async def update_stats_channels(guild):
     global last_notification_time, last_difficulty, last_hashrate, last_block_count, last_supply, last_price, last_volume
@@ -162,6 +173,15 @@ async def update_stats_channels(guild):
                     last_supply = float(supply_data["coinsupply"])
             except Exception:
                 pass
+
+            # Fetch Lasko users count
+            try:
+                async with session.get("https://testnetv1.telestai.io/api/v1/user/getAll") as response:
+                    users_data = await response.json()
+                    lasko_users_count = len(users_data)
+            except Exception as e:
+                print(f"An error occurred while fetching Lasko users: {e}")
+                lasko_users_count = "N/A"
 
             try:
                 async with session.get("https://api.xeggex.com/api/v2/market/getbysymbol/tls_usdt") as response:
@@ -304,6 +324,9 @@ async def update_stats_channels(guild):
         time.sleep(0.5)
         print(f"Telegram Followers '{telegram_followers_count}'")
         await create_or_update_channel(guild, category, "Telegram Followers:", telegram_followers_count)
+        time.sleep(0.5)
+        print(f"Lasko Users '{lasko_users_count}'")
+        await create_or_update_channel(guild, category, "Lasko Users:", lasko_users_count)
         time.sleep(0.5)
         print(f"Members '{member_count}'")
         await create_or_update_channel(guild, category, "Members:", member_count)
