@@ -173,7 +173,23 @@ async def update_stats_channels(guild):
             except Exception:
                 volume_xeggex = "N/A" # Set volume to "N/A" if there's an error
                 price_change_xeggex = "N/A"
+                last_price_xeggex = "N/A"
                 
+            try:
+                async with session.get("https://tradeogre.com/api/v1/ticker/tls-usdt") as response:
+                    text_data = await response.text()
+                    volume_data = json.loads(text_data)
+                    volume_tradeogre = float(volume_data["volume"])
+                    last_price_tradeogre = volume_data["price"]
+                    # Calculate price change manually using initialprice and current price
+                    initial_price = float(volume_data["initialprice"])
+                    current_price = float(volume_data["price"])
+                    price_change_tradeogre = ((current_price - initial_price) / initial_price) * 100
+            except Exception:
+                volume_tradeogre = 0  # Set volume to 0 if there's an error
+                last_price_tradeogre = "N/A"
+                price_change_tradeogre = "N/A"
+
             volume_coinmetro = "N/A"
             last_price_coinmetro = "N/A"
             price_change_coinmetro = "N/A"
@@ -201,41 +217,52 @@ async def update_stats_channels(guild):
                 price_change_coinmetro = "N/A"
 
             # Calculate last price using volume-weighted average
-            if last_price_xeggex != "N/A" and last_price_coinmetro != "N/A" and volume_xeggex != "N/A" and volume_coinmetro != "N/A":
-                total_volume = volume_xeggex + volume_coinmetro
-                
-                # Calculate weighted average
-                weight_xeggex = volume_xeggex / total_volume
-                weight_coinmetro = volume_coinmetro / total_volume
-                
-                last_price = (float(last_price_xeggex) * weight_xeggex) + (float(last_price_coinmetro) * weight_coinmetro)
+            available_exchanges = []
+            if last_price_xeggex != "N/A" and volume_xeggex != "N/A":
+                available_exchanges.append({
+                    "price": float(last_price_xeggex),
+                    "volume": float(volume_xeggex),
+                    "change": price_change_xeggex
+                })
+            if last_price_coinmetro != "N/A" and volume_coinmetro != "N/A":
+                available_exchanges.append({
+                    "price": float(last_price_coinmetro),
+                    "volume": float(volume_coinmetro),
+                    "change": price_change_coinmetro
+                })
+            if last_price_tradeogre != "N/A" and volume_tradeogre != "N/A":
+                available_exchanges.append({
+                    "price": float(last_price_tradeogre),
+                    "volume": float(volume_tradeogre),
+                    "change": price_change_tradeogre
+                })
 
-                # Calculate weighted average of price change
-                if price_change_xeggex != "N/A" and price_change_coinmetro != "N/A":
-                    price_change = (float(price_change_xeggex) * weight_xeggex) + (float(price_change_coinmetro) * weight_coinmetro)
-                    # Format price change with arrows
+            # Print which exchanges are being used
+            print("\nExchanges being used:")
+            if last_price_xeggex != "N/A" and volume_xeggex != "N/A":
+                print(f"XeggeX - Price: ${float(last_price_xeggex):.6f}, Volume: ${float(volume_xeggex):,.2f}")
+            if last_price_coinmetro != "N/A" and volume_coinmetro != "N/A":
+                print(f"CoinMetro - Price: ${float(last_price_coinmetro):.6f}, Volume: ${float(volume_coinmetro):,.2f}")
+            if last_price_tradeogre != "N/A" and volume_tradeogre != "N/A":
+                print(f"TradeOgre - Price: ${float(last_price_tradeogre):.6f}, Volume: ${float(volume_tradeogre):,.2f}")
+            print(f"Total exchanges used: {len(available_exchanges)}\n")
+
+            if available_exchanges:
+                total_volume = sum(exchange["volume"] for exchange in available_exchanges)
+                last_price = sum(exchange["price"] * (exchange["volume"] / total_volume) for exchange in available_exchanges)
+
+                # Calculate weighted average of price change if all available exchanges have price change data
+                available_changes = [exchange["change"] for exchange in available_exchanges if exchange["change"] != "N/A"]
+                if available_changes:
+                    price_change = sum(
+                        float(exchange["change"]) * (exchange["volume"] / total_volume)
+                        for exchange in available_exchanges
+                        if exchange["change"] != "N/A"
+                    )
                     if price_change >= 0:
                         price_display = f"${last_price:.6f} (▲ +{price_change:.2f}% 24h)"
                     else:
                         price_display = f"${last_price:.6f} (▼ {price_change:.2f}% 24h)"
-                else:
-                    price_display = f"${last_price:.6f}"
-            elif last_price_xeggex != "N/A":
-                last_price = last_price_xeggex
-                if price_change_xeggex != "N/A":
-                    if float(price_change_xeggex) >= 0:
-                        price_display = f"${last_price:.6f} (▲ +{price_change_xeggex:.2f}% 24h)"
-                    else:
-                        price_display = f"${last_price:.6f} (▼ {price_change_xeggex:.2f}% 24h)"
-                else:
-                    price_display = f"${last_price:.6f}"
-            elif last_price_coinmetro != "N/A":
-                last_price = last_price_coinmetro
-                if price_change_coinmetro != "N/A":
-                    if float(price_change_coinmetro) >= 0:
-                        price_display = f"${last_price:.6f} (▲ +{price_change_coinmetro:.2f}% 24h)"
-                    else:
-                        price_display = f"${last_price:.6f} (▼ {price_change_coinmetro:.2f}% 24h)"
                 else:
                     price_display = f"${last_price:.6f}"
             else:
@@ -245,13 +272,13 @@ async def update_stats_channels(guild):
             # Calculate total volume
             try:
                 if volume_xeggex != "N/A" and volume_coinmetro != "N/A":
-                    last_volume = float(volume_xeggex) + float(volume_coinmetro)
+                    last_volume = float(volume_xeggex) + float(volume_coinmetro) + volume_tradeogre
                 elif volume_xeggex != "N/A":
-                    last_volume = volume_xeggex
+                    last_volume = float(volume_xeggex) + volume_tradeogre
                 elif volume_coinmetro != "N/A":
-                    last_volume = volume_coinmetro
+                    last_volume = float(volume_coinmetro) + volume_tradeogre
                 else:
-                    last_volume = "N/A"
+                    last_volume = volume_tradeogre
             except Exception as e:
                 print(f"Error calculating total volume: {e}")
                 last_volume = "N/A"
