@@ -36,7 +36,7 @@ TWITTER_USERNAME = os.getenv("TWITTER_USERNAME")
 twitter_client = tweepy.Client(bearer_token=BEARER_TOKEN)
 
 # Global variables to store the last successful values
-last_followers_count = 1503  # Initial value
+last_followers_count = 1529  # Initial value
 last_difficulty = "N/A"
 last_hashrate = "N/A"
 last_block_count = "N/A"
@@ -100,7 +100,7 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
         if isinstance(stat_value, str) and stat_value == "N/A":
             formatted_value = stat_value
         else:
-            if channel_name.lower() in ["x followers:", "telegram followers:", "members:"]:
+            if channel_name.lower() in ["x followers:", "telegram followers:", "members:", "lasko users:"]:
                 formatted_value = "{:,.0f}".format(stat_value)
             elif channel_name.lower() == "supply:":
                 formatted_value = "{:,.0f} TLS".format(stat_value)
@@ -121,17 +121,6 @@ async def create_or_update_channel(guild, category, channel_name, stat_value):
 
     except Exception as e:
         print(f"An error occurred while updating channel name: {e}")
-
-# Function to get Lasko users count
-async def get_lasko_users():
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get("https://testnetv1.telestai.io/api/v1/user/getAll") as response:
-                users_data = await response.json()
-                return len(users_data)
-    except Exception as e:
-        print(f"An error occurred while fetching Lasko users: {e}")
-        return "N/A"
 
 # Function to update all statistics channels within a guild
 async def update_stats_channels(guild):
