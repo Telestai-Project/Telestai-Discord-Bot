@@ -36,7 +36,7 @@ TWITTER_USERNAME = os.getenv("TWITTER_USERNAME")
 twitter_client = tweepy.Client(bearer_token=BEARER_TOKEN)
 
 # Global variables to store the last successful values
-last_followers_count = 1529  # Initial value
+last_followers_count = 1650  # Initial value
 last_difficulty = "N/A"
 last_hashrate = "N/A"
 last_block_count = "N/A"
@@ -173,18 +173,6 @@ async def update_stats_channels(guild):
                 lasko_users_count = "N/A"
 
             try:
-                async with session.get("https://api.xeggex.com/api/v2/market/getbysymbol/tls_usdt") as response:
-                    price_data = await response.json()
-                    last_price_xeggex = price_data["lastPrice"]
-                    volume_tls = price_data["volume"]
-                    volume_xeggex = float(volume_tls) * float(last_price_xeggex)
-                    price_change_xeggex = price_data.get("changePercent", "N/A")
-            except Exception:
-                volume_xeggex = "N/A" # Set volume to "N/A" if there's an error
-                price_change_xeggex = "N/A"
-                last_price_xeggex = "N/A"
-                
-            try:
                 async with session.get("https://tradeogre.com/api/v1/ticker/tls-usdt") as response:
                     text_data = await response.text()
                     volume_data = json.loads(text_data)
@@ -227,12 +215,6 @@ async def update_stats_channels(guild):
 
             # Calculate last price using volume-weighted average
             available_exchanges = []
-            if last_price_xeggex != "N/A" and volume_xeggex != "N/A":
-                available_exchanges.append({
-                    "price": float(last_price_xeggex),
-                    "volume": float(volume_xeggex),
-                    "change": price_change_xeggex
-                })
             if last_price_coinmetro != "N/A" and volume_coinmetro != "N/A":
                 available_exchanges.append({
                     "price": float(last_price_coinmetro),
@@ -248,8 +230,6 @@ async def update_stats_channels(guild):
 
             # Print which exchanges are being used
             print("\nExchanges being used:")
-            if last_price_xeggex != "N/A" and volume_xeggex != "N/A":
-                print(f"XeggeX - Price: ${float(last_price_xeggex):.6f}, Volume: ${float(volume_xeggex):,.2f}")
             if last_price_coinmetro != "N/A" and volume_coinmetro != "N/A":
                 print(f"CoinMetro - Price: ${float(last_price_coinmetro):.6f}, Volume: ${float(volume_coinmetro):,.2f}")
             if last_price_tradeogre != "N/A" and volume_tradeogre != "N/A":
@@ -280,14 +260,12 @@ async def update_stats_channels(guild):
 
             # Calculate total volume
             try:
-                if volume_xeggex != "N/A" and volume_coinmetro != "N/A":
-                    last_volume = float(volume_xeggex) + float(volume_coinmetro) + volume_tradeogre
-                elif volume_xeggex != "N/A":
-                    last_volume = float(volume_xeggex) + volume_tradeogre
+                if volume_coinmetro != "N/A" and volume_tradeogre != "N/A":
+                    last_volume = float(volume_coinmetro) + float(volume_tradeogre)
                 elif volume_coinmetro != "N/A":
-                    last_volume = float(volume_coinmetro) + volume_tradeogre
+                    last_volume = float(volume_coinmetro)
                 else:
-                    last_volume = volume_tradeogre
+                    last_volume = float(volume_tradeogre)
             except Exception as e:
                 print(f"Error calculating total volume: {e}")
                 last_volume = "N/A"
